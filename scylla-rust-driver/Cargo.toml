@@ -1,0 +1,14 @@
+[package]
+name = "basic"
+version = "0.1.0"
+authors = []
+edition = "2018"
+
+[dependencies]
+scylla = { git = "https://github.com/scylladb/scylla-rust-driver", branch = "main" }
+tokio = { version = "1.12", features = ["full"] }
+getopts = "0.2.12"
+anyhow = "1.0.40"
+
+[profile.release]
+lto = true
