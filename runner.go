@@ -15,29 +15,29 @@ import (
 
 // Absolute paths to drivers.
 const (
-	scyllaGoPath   = ""
-	gocqlPath      = ""
-	scyllaRustPath = ""
+	scyllaGoPath   = "/home/pawelputra/repos/test/benchtabs/scylla-go-driver"
+	gocqlPath      = "/home/pawelputra/repos/test/benchtabs/gocql"
+	scyllaRustPath = "/home/pawelputra/repos/test/benchtabs/scylla-rust-driver/src"
 )
 
 // For testing if all drivers are setup correctly.
-// var (
-// 	addr        = "192.168.100.100:9042"
-// 	runs        = 1
-// 	workloads   = []string{"mixed"}
-// 	tasks       = []int{1_000_000}
-// 	concurrency = []int{1024}
-// 	cpu         = runtime.NumCPU()
-// )
-
 var (
 	addr        = "192.168.100.100:9042"
-	runs        = 5
-	workloads   = []string{"inserts", "mixed"}
-	tasks       = []int{1_000_000, 10_000_000, 100_000_000}
-	concurrency = []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
+	runs        = 1
+	workloads   = []string{"mixed"}
+	tasks       = []int{1_000_000}
+	concurrency = []int{1024}
 	cpu         = runtime.NumCPU()
 )
+
+// var (
+// 	addr        = "192.168.100.100:9042"
+// 	runs        = 5
+// 	workloads   = []string{"inserts", "mixed"}
+// 	tasks       = []int{1_000_000, 10_000_000, 100_000_000}
+// 	concurrency = []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
+// 	cpu         = runtime.NumCPU()
+// )
 
 type benchResult struct {
 	name        string
@@ -108,6 +108,7 @@ func runBenchmark(name, cmd, path string) []benchResult {
 				cmdWithFlags := addFlags(cmd, workload, addr, tasksNum, concurrencyNum)
 				for i := 0; i < runs; i++ {
 					time.Sleep(time.Second)
+					fmt.Printf("%s - run: %v, workload: %s, tasks: %v, concurrency: %v", name, i+1, workload, tasksNum, concurrencyNum)
 					log.Printf("%s - run: %v, workload: %s, tasks: %v, concurrency: %v", name, i+1, workload, tasksNum, concurrencyNum)
 					log.Println(cmdWithFlags)
 					out, err := exec.Command("/bin/sh", "-c", "cd "+path+"; "+cmdWithFlags+";").CombinedOutput()
@@ -115,7 +116,9 @@ func runBenchmark(name, cmd, path string) []benchResult {
 						panic(fmt.Errorf("%w log:\n%s", err, out))
 					}
 					t := getTime(string(out))
-					log.Printf(" time: %v\n", t)
+					log.Println(string(out))
+
+					fmt.Printf(" time: %v\n", t)
 					result.insert(t, i)
 				}
 				result.calculateMeanAndDev()
