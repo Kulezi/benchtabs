@@ -20,6 +20,8 @@ type Config struct {
 	concurrency   int64
 	batchSize     int64
 	dontPrepare   bool
+	profileCPU    bool
+	profileMem    bool
 }
 
 func readConfig() Config {
@@ -58,6 +60,19 @@ func readConfig() Config {
 		"Don't create tables and insert into them before the benchmark",
 	)
 
+	flag.BoolVar(
+		&config.profileCPU,
+		"profile-cpu",
+		false,
+		"Use CPU profiling",
+	)
+
+	flag.BoolVar(
+		&config.profileMem,
+		"profile-mem",
+		false,
+		"Use memory profiling",
+	)
 	flag.Parse()
 
 	for _, node_address := range strings.Split(*nodes, ",") {

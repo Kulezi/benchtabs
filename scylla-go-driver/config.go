@@ -74,7 +74,7 @@ func readConfig() Config {
 
 	flag.Int64Var(
 		&config.workers,
-		"workers",
+		"concurrency",
 		1024,
 		"Maximum number of workers",
 	)

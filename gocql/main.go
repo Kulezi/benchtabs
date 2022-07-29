@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/pkg/profile"
 )
 
 const insertStmt = "INSERT INTO benchks.benchtab (pk, v1, v2) VALUES(?, ?, ?)"
@@ -17,6 +19,17 @@ func main() {
 	config := readConfig()
 	fmt.Printf("Benchmark configuration: %#v\n", config)
 
+	if config.profileCPU && config.profileMem {
+		log.Fatal("select one profile type")
+	}
+	if config.profileCPU {
+		log.Println("Running with CPU profiling")
+		defer profile.Start(profile.CPUProfile).Stop()
+	}
+	if config.profileMem {
+		log.Println("Running with memory profiling")
+		defer profile.Start(profile.MemProfile).Stop()
+	}
 	cluster := gocql.NewCluster(config.nodeAddresses[:]...)
 	cluster.Timeout = 5 * time.Second
 	cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())

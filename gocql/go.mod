@@ -2,7 +2,10 @@ module main
 
 go 1.18
 
-require github.com/gocql/gocql v1.2.0
+require (
+	github.com/gocql/gocql v1.2.0
+	github.com/pkg/profile v1.6.0
+)
 
 require (
 	github.com/golang/snappy v0.0.3 // indirect

@@ -2,7 +2,7 @@
 name = "basic"
 version = "0.1.0"
 authors = []
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 scylla = { git = "https://github.com/scylladb/scylla-rust-driver", branch = "main" }

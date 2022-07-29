@@ -228,16 +228,17 @@ func initKeyspaceAndTable(session *scylla.Session, ks string) {
 	if _, err := q.Exec(); err != nil {
 		log.Fatal(err)
 	}
-
+	time.Sleep(1 * time.Second)
 	q = session.Query("CREATE KEYSPACE " + ks + " WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}")
 	if _, err := q.Exec(); err != nil {
 		log.Fatal(err)
 	}
-
+	time.Sleep(1 * time.Second)
 	q = session.Query("CREATE TABLE " + ks + ".benchtab (pk bigint PRIMARY KEY, v1 bigint, v2 bigint)")
 	if _, err := q.Exec(); err != nil {
 		log.Fatal(err)
 	}
+	time.Sleep(1 * time.Second)
 }
 
 func initSelectsBenchmark(session *scylla.Session, config Config) {
