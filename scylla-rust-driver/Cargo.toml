@@ -5,7 +5,7 @@ authors = []
 edition = "2021"
 
 [dependencies]
-scylla = { git = "https://github.com/scylladb/scylla-rust-driver", branch = "main" }
+scylla = { version = "0.4.7" }
 tokio = { version = "1.12", features = ["full"] }
 getopts = "0.2.12"
 anyhow = "1.0.40"
