@@ -121,7 +121,7 @@ func runBenchmark(name, cmd, path string) {
 					out, err := exec.Command(
 						"/bin/sh",
 						"-c",
-						"cd "+path+"; "+cmdWithFlags+" >"+runOut+" 2>>"+logPath+";").CombinedOutput()
+						"cd "+path+"; /usr/bin/time "+cmdWithFlags+" >"+runOut+" 2>>"+logPath+";").CombinedOutput()
 					if err != nil {
 						panic(fmt.Errorf("%w output:\n%s", err, out))
 					}
@@ -222,7 +222,7 @@ func makeCSV(out string, results []benchResult) {
 }
 
 func main() {
-	fmt.Println("driver, workload, tasks, concurrency, run, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
+	fmt.Println("driver, workload, tasks, concurrency, run, bench_time, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
 
 	runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
 	runBenchmark("gocql", "go run .", gocqlPath)
