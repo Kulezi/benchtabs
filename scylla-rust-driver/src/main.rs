@@ -7,17 +7,21 @@ use scylla::{IntoTypedRows, Session, SessionBuilder};
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
+use rand::Rng;
+
+const SAMPLES: i64 = 20000;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("Starting scylla-rust-driver benchmark\n");
+    eprintln!("Starting scylla-rust-driver benchmark\n");
 
     let config: Arc<Config> = match Config::read()? {
         Some(config) => Arc::new(config),
         None => return Ok(()), // --help only prints usage
     };
 
-    println!("Benchmark configuration:\n{:#?}\n", config);
+    eprintln!("Benchmark configuration:\n{:#?}\n", config);
 
     let session: Session = SessionBuilder::new()
         .user("cassandra", "cassandra")
@@ -44,9 +48,13 @@ async fn main() -> Result<()> {
     let mut handles = Vec::with_capacity(config.concurrency.try_into().unwrap());
     let next_batch_start = Arc::new(AtomicI64::new(0));
 
-    println!("\nStarting the benchmark");
+    eprintln!("\nStarting the benchmark");
 
     let start_time = std::time::Instant::now();
+
+
+    let selects = Arc::new(Mutex::new(Vec::new()));
+    let inserts = Arc::new(Mutex::new(Vec::new()));
 
     for _ in 0..config.concurrency {
         let session = session.clone();
@@ -54,7 +62,8 @@ async fn main() -> Result<()> {
         let prepared_select = prepared_select.clone();
         let config = config.clone();
         let next_batch_start = next_batch_start.clone();
-
+        let selects = selects.clone();
+        let inserts = inserts.clone();
         handles.push(tokio::spawn(async move {
             loop {
                 let cur_batch_start: i64 =
@@ -69,14 +78,29 @@ async fn main() -> Result<()> {
                     std::cmp::min(cur_batch_start + config.batch_size, config.tasks);
 
                 for pk in cur_batch_start..cur_batch_end {
+
+                    let mut sample = false;
+                    let mut sample_start: Option<std::time::Instant> = None;
+                    if rand::thread_rng().gen_range(0..config.tasks) < SAMPLES {
+                        sample = true;
+                    }
                     if config.workload == Workload::Inserts || config.workload == Workload::Mixed {
+                        if sample {
+                            sample_start = Some(std::time::Instant::now());
+                        }
                         session
                             .execute(&prepared_insert, (pk, 2 * pk, 3 * pk))
                             .await
                             .unwrap();
+                        if sample {
+                            inserts.lock().unwrap().push(sample_start.unwrap().elapsed().as_nanos())
+                        }
                     }
 
                     if config.workload == Workload::Selects || config.workload == Workload::Mixed {
+                        if sample {
+                            sample_start = Some(std::time::Instant::now());
+                        }
                         let (v1, v2): (i64, i64) = session
                             .execute(&prepared_select, (pk,))
                             .await
@@ -87,8 +111,10 @@ async fn main() -> Result<()> {
                             .next()
                             .unwrap()
                             .unwrap();
-
                         assert_eq!((v1, v2), (2 * pk, 3 * pk));
+                        if sample {
+                            selects.lock().unwrap().push(sample_start.unwrap().elapsed().as_nanos())
+                        }
                     }
                 }
             }
@@ -100,7 +126,16 @@ async fn main() -> Result<()> {
     }
 
     let bench_time = start_time.elapsed();
-    println!("Finished\n\nBenchmark time: {} ms", bench_time.as_millis());
+    eprintln!("Finished\n\nBenchmark time: {} ms", bench_time.as_millis());
+
+    println!("time {}", bench_time.as_millis());
+    for sample in selects.lock().unwrap().iter() {
+        println!("select {}", sample)
+    }
+
+    for sample in inserts.lock().unwrap().iter() {
+        println!("insert {}", sample)
+    }
 
     Ok(())
 }
