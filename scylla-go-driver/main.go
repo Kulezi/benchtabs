@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +14,8 @@ import (
 
 const insertStmt = "INSERT INTO benchtab (pk, v1, v2) VALUES(?, ?, ?)"
 const selectStmt = "SELECT v1, v2 FROM benchtab WHERE pk = ?"
+
+const samples = 20_000
 
 func main() {
 	config := readConfig()
@@ -64,6 +68,8 @@ func benchmark(config *Config, session *scylla.Session) {
 	log.Println("Starting the benchmark")
 	startTime := time.Now()
 
+	selectCh := make(chan time.Duration, 2*samples)
+	insertCh := make(chan time.Duration, 2*samples)
 	for i := int64(0); i < config.workers; i++ {
 		wg.Add(1)
 		go func() {
@@ -87,14 +93,30 @@ func benchmark(config *Config, session *scylla.Session) {
 				curBatchEnd := min(curBatchStart+config.batchSize, config.tasks)
 
 				for pk := curBatchStart; pk < curBatchEnd; pk++ {
+					sample := false
+					var startTime time.Time
+					if rand.Int63n(config.tasks) < samples {
+						sample = true
+					}
+
 					if config.workload == Inserts || config.workload == Mixed {
+						if sample {
+							startTime = time.Now()
+						}
 						_, err := insertQ.BindInt64(0, pk).BindInt64(1, 2*pk).BindInt64(2, 3*pk).Exec()
 						if err != nil {
 							panic(err)
 						}
+						if sample {
+							insertCh <- time.Now().Sub(startTime)
+						}
 					}
 
 					if config.workload == Selects || config.workload == Mixed {
+						if sample {
+							startTime = time.Now()
+						}
+
 						var v1, v2 int64
 						res, err := selectQ.BindInt64(0, pk).Exec()
 						if err != nil {
@@ -112,6 +134,10 @@ func benchmark(config *Config, session *scylla.Session) {
 						if v1 != 2*pk || v2 != 3*pk {
 							log.Fatalf("expected (%d, %d), got (%d, %d)", 2*pk, 3*pk, v1, v2)
 						}
+
+						if sample {
+							selectCh <- time.Now().Sub(startTime)
+						}
 					}
 				}
 			}
@@ -121,6 +147,33 @@ func benchmark(config *Config, session *scylla.Session) {
 	wg.Wait()
 	benchTime := time.Now().Sub(startTime)
 	log.Printf("Finished\nBenchmark time: %d ms\n", benchTime.Milliseconds())
+	fmt.Printf("time %d\n", benchTime.Milliseconds())
+	printLatencyInfo("select", selectCh)
+	printLatencyInfo("insert", insertCh)
+}
+
+func printLatencyInfo(name string, ch chan time.Duration) {
+	cnt := len(ch)
+	for i := 0; i < cnt; i++ {
+		fmt.Printf("%s %d\n", name, (<-ch).Nanoseconds())
+	}
+
+	// cnt := len(ch)
+	// latencies := make([]time.Duration, cnt)
+	// sum := time.Duration(0)
+	// for i := 0; i < cnt; i++ {
+	// 	latencies[i] = <-ch
+	// 	sum += latencies[i]
+	// }
+
+	// avg := sum / time.Duration(cnt)
+	// devSum := time.Duration(0)
+	// for i := 0; i < cnt; i++ {
+	// 	dev := (avg - latencies[i])
+	// 	devSum += dev * dev
+	// }
+
+	// stdDev := math.Sqrt(float64(devSum) / float64(time.Duration(cnt)))
 }
 
 func initKeyspaceAndTable(session *scylla.Session, ks string) {

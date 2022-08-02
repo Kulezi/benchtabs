@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -11,13 +13,21 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/jamiealquiza/tachymeter"
 )
 
 // Absolute paths to drivers.
 const (
-	scyllaGoPath   = "/home/pawelputra/repos/test/benchtabs/scylla-go-driver"
-	gocqlPath      = "/home/pawelputra/repos/test/benchtabs/gocql"
-	scyllaRustPath = "/home/pawelputra/repos/test/benchtabs/scylla-rust-driver/src"
+	benchPath      = "/home/pawelputra/repos/benchtabs"
+	scyllaGoPath   = "scylla-go-driver"
+	gocqlPath      = "gocql"
+	scyllaRustPath = "scylla-rust-driver/src"
+
+	outPath = benchPath + "/running.out"
+	logPath = benchPath + "/running.log"
+
+	nap = 60
 )
 
 // For testing if all drivers are setup correctly.
@@ -107,27 +117,75 @@ func runBenchmark(name, cmd, path string) []benchResult {
 				result := newBenchResult(name, workload, runs, tasksNum, concurrencyNum)
 				cmdWithFlags := addFlags(cmd, workload, addr, tasksNum, concurrencyNum)
 				for i := 0; i < runs; i++ {
-					fmt.Printf("%s - run: %v, workload: %s, tasks: %v, concurrency: %v", name, i+1, workload, tasksNum, concurrencyNum)
 					log.Printf("%s - run: %v, workload: %s, tasks: %v, concurrency: %v", name, i+1, workload, tasksNum, concurrencyNum)
 					log.Println(cmdWithFlags)
-					out, err := exec.Command("/bin/sh", "-c", "cd "+path+"; "+cmdWithFlags+";").CombinedOutput()
+					out, err := exec.Command(
+						"/bin/sh",
+						"-c",
+						"cd "+path+"; "+cmdWithFlags+" >"+outPath+" 2>>"+logPath+";").CombinedOutput()
 					if err != nil {
-						panic(fmt.Errorf("%w log:\n%s", err, out))
+						panic(fmt.Errorf("%w output:\n%s", err, out))
 					}
-					t := getTime(string(out))
-					log.Println(string(out))
 
-					fmt.Printf(" time: %v\n", t)
-					result.insert(t, i)
-					time.Sleep(60 * time.Second)
+					fmt.Printf("%s, %v, %s, %v, %v, ", name, i+1, workload, tasksNum, concurrencyNum)
+					printParsedResultsFromFile(outPath, tasksNum)
+
+					time.Sleep(nap * time.Second)
 				}
-				result.calculateMeanAndDev()
+
 				results = append(results, result)
 			}
 		}
 	}
 
 	return results
+}
+
+func printParsedResultsFromFile(path string, tasksNum int) {
+	f, err := os.Open(path)
+	if err != nil {
+		panic(err)
+	}
+
+	r := bufio.NewReader(f)
+
+	var selects, inserts []time.Duration
+	for {
+		var typ string
+		var t int64
+		_, err := fmt.Fscan(r, &typ, &t)
+		if err != nil && err != io.EOF {
+			panic(err)
+		} else if err == io.EOF {
+			break
+		}
+
+		switch typ {
+		case "time":
+			log.Printf("benchmark time: %dms\n", t)
+			fmt.Printf("%dms", t)
+		case "select":
+			selects = append(selects, time.Duration(t))
+		case "insert":
+			inserts = append(inserts, time.Duration(t))
+		}
+	}
+
+	printLatencyInfo("select", selects, tasksNum)
+	printLatencyInfo("insert", inserts, tasksNum)
+	fmt.Println()
+}
+
+func printLatencyInfo(name string, samples []time.Duration, tasksNum int) {
+	t := tachymeter.New(&tachymeter.Config{Size: tasksNum})
+
+	for _, v := range samples {
+		t.AddTime(v)
+	}
+
+	metrics := t.Calc()
+	log.Println(metrics)
+	fmt.Printf(", %s, %s, %s", metrics.Time.Avg, metrics.Time.StdDev, metrics.Time.P99)
 }
 
 func makeCSV(out string, results []benchResult) {
@@ -167,14 +225,17 @@ func makeCSV(out string, results []benchResult) {
 }
 
 func main() {
-	scyllaRustResults := runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
-	gocqlResults := runBenchmark("gocql", "go run .", gocqlPath)
+	fmt.Println("driver, run, workload, tasks, concurrency, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
+
+	// scyllaRustResults := runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
+	// gocqlResults := runBenchmark("gocql", "go run .", gocqlPath)
 	scyllaGoResults := runBenchmark("scylla-go-driver", "go run .", scyllaGoPath)
+	log.Println(scyllaGoResults)
 
-	var results []benchResult
-	results = append(results, scyllaGoResults...)
-	results = append(results, scyllaRustResults...)
-	results = append(results, gocqlResults...)
+	// var results []benchResult
+	// results = append(results, scyllaGoResults...)
+	// results = append(results, scyllaRustResults...)
+	// results = append(results, gocqlResults...)
 
-	makeCSV("./benchmarkResults", results)
+	// makeCSV("./benchmarkResults", results)
 }
