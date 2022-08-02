@@ -107,7 +107,6 @@ func runBenchmark(name, cmd, path string) []benchResult {
 				result := newBenchResult(name, workload, runs, tasksNum, concurrencyNum)
 				cmdWithFlags := addFlags(cmd, workload, addr, tasksNum, concurrencyNum)
 				for i := 0; i < runs; i++ {
-					time.Sleep(time.Second)
 					fmt.Printf("%s - run: %v, workload: %s, tasks: %v, concurrency: %v", name, i+1, workload, tasksNum, concurrencyNum)
 					log.Printf("%s - run: %v, workload: %s, tasks: %v, concurrency: %v", name, i+1, workload, tasksNum, concurrencyNum)
 					log.Println(cmdWithFlags)
@@ -120,6 +119,7 @@ func runBenchmark(name, cmd, path string) []benchResult {
 
 					fmt.Printf(" time: %v\n", t)
 					result.insert(t, i)
+					time.Sleep(60 * time.Second)
 				}
 				result.calculateMeanAndDev()
 				results = append(results, result)
