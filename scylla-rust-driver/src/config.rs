@@ -62,7 +62,8 @@ impl Config {
             return Ok(None);
         }
 
-        let addresses: String = parsed.opt_get_default("nodes", "192.168.100.100:9042".to_string())?;
+        let addresses: String =
+            parsed.opt_get_default("nodes", "192.168.100.100:9042".to_string())?;
 
         let node_addresses: Vec<String> = addresses.split(',').map(|s| s.to_string()).collect();
 

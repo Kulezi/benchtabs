@@ -2,13 +2,13 @@ mod config;
 
 use anyhow::Result;
 use config::{Config, Workload};
+use rand::Rng;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::{IntoTypedRows, Session, SessionBuilder};
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use rand::Rng;
 
 const SAMPLES: i64 = 20000;
 
@@ -52,7 +52,6 @@ async fn main() -> Result<()> {
 
     let start_time = std::time::Instant::now();
 
-
     let selects = Arc::new(Mutex::new(Vec::new()));
     let inserts = Arc::new(Mutex::new(Vec::new()));
 
@@ -78,7 +77,6 @@ async fn main() -> Result<()> {
                     std::cmp::min(cur_batch_start + config.batch_size, config.tasks);
 
                 for pk in cur_batch_start..cur_batch_end {
-
                     let mut sample = false;
                     let mut sample_start: Option<std::time::Instant> = None;
                     if rand::thread_rng().gen_range(0..config.tasks) < SAMPLES {
@@ -93,7 +91,10 @@ async fn main() -> Result<()> {
                             .await
                             .unwrap();
                         if sample {
-                            inserts.lock().unwrap().push(sample_start.unwrap().elapsed().as_nanos())
+                            inserts
+                                .lock()
+                                .unwrap()
+                                .push(sample_start.unwrap().elapsed().as_nanos())
                         }
                     }
 
@@ -113,7 +114,10 @@ async fn main() -> Result<()> {
                             .unwrap();
                         assert_eq!((v1, v2), (2 * pk, 3 * pk));
                         if sample {
-                            selects.lock().unwrap().push(sample_start.unwrap().elapsed().as_nanos())
+                            selects
+                                .lock()
+                                .unwrap()
+                                .push(sample_start.unwrap().elapsed().as_nanos())
                         }
                     }
                 }
