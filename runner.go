@@ -24,10 +24,10 @@ const (
 	gocqlPath      = "gocql"
 	scyllaRustPath = "scylla-rust-driver/src"
 
-	outPath = benchPath + "/running.out"
+	outPath = benchPath + "/results/"
 	logPath = benchPath + "/running.log"
 
-	nap = 60
+	nap = 5
 )
 
 // For testing if all drivers are setup correctly.
@@ -109,36 +109,33 @@ func addFlags(cmd, workload, addr string, tasks, concurrency int) string {
 	return cmd + " --nodes " + addr + " --workload " + workload + " --tasks " + strconv.Itoa(tasks) + " --concurrency " + strconv.Itoa(concurrency)
 }
 
-func runBenchmark(name, cmd, path string) []benchResult {
-	var results []benchResult
+func runBenchmark(name, cmd, path string) {
 	for _, workload := range workloads {
 		for _, tasksNum := range tasks {
 			for _, concurrencyNum := range concurrency {
-				result := newBenchResult(name, workload, runs, tasksNum, concurrencyNum)
 				cmdWithFlags := addFlags(cmd, workload, addr, tasksNum, concurrencyNum)
 				for i := 0; i < runs; i++ {
-					log.Printf("%s - run: %v, workload: %s, tasks: %v, concurrency: %v", name, i+1, workload, tasksNum, concurrencyNum)
+					runOut := fmt.Sprintf("%s%s_workload=%s_tasks=%d_concurrency=%d_run=%d", outPath, name, workload, tasksNum, concurrencyNum, i+1)
+					log.Printf("%s - workload: %s, tasks: %v, concurrency: %v, run: %v, ", name, workload, tasksNum, concurrencyNum, i+1)
 					log.Println(cmdWithFlags)
 					out, err := exec.Command(
 						"/bin/sh",
 						"-c",
-						"cd "+path+"; "+cmdWithFlags+" >"+outPath+" 2>>"+logPath+";").CombinedOutput()
+						"cd "+path+"; "+cmdWithFlags+" >"+runOut+" 2>>"+logPath+";").CombinedOutput()
 					if err != nil {
 						panic(fmt.Errorf("%w output:\n%s", err, out))
 					}
 
-					fmt.Printf("%s, %v, %s, %v, %v, ", name, i+1, workload, tasksNum, concurrencyNum)
-					printParsedResultsFromFile(outPath, tasksNum)
+					fmt.Printf("%s, %s, %v, %v, %v, ", name, workload, tasksNum, concurrencyNum, i+1)
+					printParsedResultsFromFile(runOut, tasksNum)
 
 					time.Sleep(nap * time.Second)
 				}
 
-				results = append(results, result)
 			}
 		}
 	}
 
-	return results
 }
 
 func printParsedResultsFromFile(path string, tasksNum int) {
@@ -185,7 +182,7 @@ func printLatencyInfo(name string, samples []time.Duration, tasksNum int) {
 
 	metrics := t.Calc()
 	log.Println(metrics)
-	fmt.Printf(", %s, %s, %s", metrics.Time.Avg, metrics.Time.StdDev, metrics.Time.P99)
+	fmt.Printf(", %dns, %dns, %dns", metrics.Time.Avg.Nanoseconds(), metrics.Time.StdDev.Nanoseconds(), metrics.Time.P99.Nanoseconds())
 }
 
 func makeCSV(out string, results []benchResult) {
@@ -225,17 +222,10 @@ func makeCSV(out string, results []benchResult) {
 }
 
 func main() {
-	fmt.Println("driver, run, workload, tasks, concurrency, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
+	fmt.Println("driver, workload, tasks, concurrency, run, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
 
-	// scyllaRustResults := runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
-	// gocqlResults := runBenchmark("gocql", "go run .", gocqlPath)
-	scyllaGoResults := runBenchmark("scylla-go-driver", "go run .", scyllaGoPath)
-	log.Println(scyllaGoResults)
+	runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
+	runBenchmark("gocql", "go run .", gocqlPath)
+	runBenchmark("scylla-go-driver", "go run .", scyllaGoPath)
 
-	// var results []benchResult
-	// results = append(results, scyllaGoResults...)
-	// results = append(results, scyllaRustResults...)
-	// results = append(results, gocqlResults...)
-
-	// makeCSV("./benchmarkResults", results)
 }
