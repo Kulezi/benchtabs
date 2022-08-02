@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,10 +15,11 @@ import (
 
 const insertStmt = "INSERT INTO benchks.benchtab (pk, v1, v2) VALUES(?, ?, ?)"
 const selectStmt = "SELECT v1, v2 FROM benchks.benchtab WHERE pk = ?"
+const samples = 20_000
 
 func main() {
 	config := readConfig()
-	fmt.Printf("Benchmark configuration: %#v\n", config)
+	log.Printf("Benchmark configuration: %#v\n", config)
 
 	if config.profileCPU && config.profileMem {
 		log.Fatal("select one profile type")
@@ -54,10 +56,12 @@ func main() {
 	var wg sync.WaitGroup
 	nextBatchStart := int64(0)
 
-	fmt.Println("Starting the benchmark")
+	log.Println("Starting the benchmark")
 
 	startTime := time.Now()
 
+	selectCh := make(chan time.Duration, 2*samples)
+	insertCh := make(chan time.Duration, 2*samples)
 	for i := int64(0); i < config.concurrency; i++ {
 		wg.Add(1)
 		go func() {
@@ -75,16 +79,29 @@ func main() {
 				curBatchEnd := min(curBatchStart+config.batchSize, config.tasks)
 
 				for pk := curBatchStart; pk < curBatchEnd; pk++ {
+					sample := false
+					var startTime time.Time
+					if rand.Int63n(config.tasks) < samples {
+						sample = true
+					}
 					if config.workload == Inserts || config.workload == Mixed {
+						if sample {
+							startTime = time.Now()
+						}
 						err := insertQ.Bind(pk, 2*pk, 3*pk).Exec()
 						if err != nil {
 							panic(err)
+						}
+						if sample {
+							insertCh <- time.Now().Sub(startTime)
 						}
 					}
 
 					if config.workload == Selects || config.workload == Mixed {
 						var v1, v2 int64
-
+						if sample {
+							startTime = time.Now()
+						}
 						err := selectQ.Bind(pk).Scan(&v1, &v2)
 						if err != nil {
 							panic(err)
@@ -92,6 +109,10 @@ func main() {
 
 						if v1 != 2*pk || v2 != 3*pk {
 							panic("bad data")
+						}
+
+						if sample {
+							selectCh <- time.Now().Sub(startTime)
 						}
 					}
 				}
@@ -102,7 +123,17 @@ func main() {
 	wg.Wait()
 	benchTime := time.Now().Sub(startTime)
 
-	fmt.Printf("Finished\nBenchmark time: %d ms\n", benchTime.Milliseconds())
+	fmt.Printf("time %d\n", benchTime.Milliseconds())
+	printLatencyInfo("select", selectCh)
+	printLatencyInfo("insert", insertCh)
+	log.Printf("Finished\nBenchmark time: %d ms\n", benchTime.Milliseconds())
+}
+
+func printLatencyInfo(name string, ch chan time.Duration) {
+	cnt := len(ch)
+	for i := 0; i < cnt; i++ {
+		fmt.Printf("%s %d\n", name, (<-ch).Nanoseconds())
+	}
 }
 
 func awaitSchemaAgreement(session *gocql.Session) {
@@ -133,7 +164,7 @@ func prepareKeyspaceAndTable(session *gocql.Session) {
 }
 
 func prepareSelectsBenchmark(session *gocql.Session, config Config) {
-	fmt.Println("Preparing a selects benchmark (inserting values)...")
+	log.Println("Preparing a selects benchmark (inserting values)...")
 
 	var wg sync.WaitGroup
 	nextBatchStart := int64(0)

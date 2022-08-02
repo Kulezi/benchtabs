@@ -157,23 +157,6 @@ func printLatencyInfo(name string, ch chan time.Duration) {
 	for i := 0; i < cnt; i++ {
 		fmt.Printf("%s %d\n", name, (<-ch).Nanoseconds())
 	}
-
-	// cnt := len(ch)
-	// latencies := make([]time.Duration, cnt)
-	// sum := time.Duration(0)
-	// for i := 0; i < cnt; i++ {
-	// 	latencies[i] = <-ch
-	// 	sum += latencies[i]
-	// }
-
-	// avg := sum / time.Duration(cnt)
-	// devSum := time.Duration(0)
-	// for i := 0; i < cnt; i++ {
-	// 	dev := (avg - latencies[i])
-	// 	devSum += dev * dev
-	// }
-
-	// stdDev := math.Sqrt(float64(devSum) / float64(time.Duration(cnt)))
 }
 
 func initKeyspaceAndTable(session *scylla.Session, ks string) {
