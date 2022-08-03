@@ -36,6 +36,7 @@ func main() {
 	cfg := scylla.DefaultSessionConfig("", config.nodeAddresses...)
 	cfg.Username = config.user
 	cfg.Password = config.password
+	cfg.Timeout = 30 * time.Second
 
 	if !config.dontPrepare {
 		initSession, err := scylla.NewSession(cfg)

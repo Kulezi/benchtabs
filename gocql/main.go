@@ -33,7 +33,7 @@ func main() {
 		defer profile.Start(profile.MemProfile).Stop()
 	}
 	cluster := gocql.NewCluster(config.nodeAddresses[:]...)
-	cluster.Timeout = 5 * time.Second
+	cluster.Timeout = 30 * time.Second
 	cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
 	cluster.Authenticator = gocql.PasswordAuthenticator{
 		Username: "cassandra",
