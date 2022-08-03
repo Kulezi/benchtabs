@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os"
@@ -23,6 +22,7 @@ const (
 	scyllaGoPath   = "scylla-go-driver"
 	gocqlPath      = "gocql"
 	scyllaRustPath = "scylla-rust-driver/src"
+	cppPath        = "cpp"
 
 	outPath = benchPath + "/results/"
 	logPath = benchPath + "/running.log"
@@ -32,7 +32,7 @@ const (
 
 // For testing if all drivers are setup correctly.
 var (
-	addr        = "192.168.100.100:9042"
+	addr        = "192.168.100.100"
 	runs        = 1
 	workloads   = []string{"mixed"}
 	tasks       = []int{1_000_000}
@@ -150,21 +150,24 @@ func printParsedResultsFromFile(path string, tasksNum int) {
 	for {
 		var typ string
 		var t int64
-		_, err := fmt.Fscan(r, &typ, &t)
-		if err != nil && err != io.EOF {
-			panic(err)
-		} else if err == io.EOF {
+		_, err := fmt.Fscan(r, &typ)
+		if err != nil {
 			break
 		}
 
 		switch typ {
 		case "time":
+			fmt.Fscan(r, &t)
 			log.Printf("benchmark time: %dms\n", t)
 			fmt.Printf("%dms", t)
 		case "select":
+			fmt.Fscan(r, &t)
 			selects = append(selects, time.Duration(t))
 		case "insert":
+			fmt.Fscan(r, &t)
 			inserts = append(inserts, time.Duration(t))
+		default:
+			continue
 		}
 	}
 
@@ -224,8 +227,8 @@ func makeCSV(out string, results []benchResult) {
 func main() {
 	fmt.Println("driver, workload, tasks, concurrency, run, bench_time, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
 
-	runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
-	runBenchmark("gocql", "go run .", gocqlPath)
+	// runBenchmark("cpp", "./benchmark", cppPath)
+	// runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
+	// runBenchmark("gocql", "go run .", gocqlPath)
 	runBenchmark("scylla-go-driver", "go run .", scyllaGoPath)
-
 }
