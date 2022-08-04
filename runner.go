@@ -23,6 +23,7 @@ const (
 	gocqlPath      = "gocql"
 	scyllaRustPath = "scylla-rust-driver/src"
 	cppPath        = "cpp"
+	javaPath       = "java/source"
 
 	outPath = benchPath + "/results/"
 	logPath = benchPath + "/running.log"
@@ -227,6 +228,7 @@ func makeCSV(out string, results []benchResult) {
 func main() {
 	fmt.Println("driver, workload, tasks, concurrency, run, bench_time, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
 
+	runBenchmark("java", "java -cp target/source-1.0-SNAPSHOT.jar MainClass", javaPath)
 	runBenchmark("cpp", "./benchmark", cppPath)
 	runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
 	runBenchmark("gocql", "go run .", gocqlPath)
