@@ -18,7 +18,7 @@ import (
 
 // Absolute paths to drivers.
 const (
-	benchPath      = "/home/pawelputra/repos/benchtabs"
+	benchPath      = "/home/ubuntu/benchtabs"
 	scyllaGoPath   = "scylla-go-driver"
 	gocqlPath      = "gocql"
 	scyllaRustPath = "scylla-rust-driver/src"
@@ -227,8 +227,8 @@ func makeCSV(out string, results []benchResult) {
 func main() {
 	fmt.Println("driver, workload, tasks, concurrency, run, bench_time, select_avg, select_stddev, select_p99, insert_avg, insert_stddev, insert_p99")
 
-	// runBenchmark("cpp", "./benchmark", cppPath)
-	// runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
-	// runBenchmark("gocql", "go run .", gocqlPath)
+	runBenchmark("cpp", "./benchmark", cppPath)
+	runBenchmark("scylla-rust-driver", "cargo run --release .", scyllaRustPath)
+	runBenchmark("gocql", "go run .", gocqlPath)
 	runBenchmark("scylla-go-driver", "go run .", scyllaGoPath)
 }
